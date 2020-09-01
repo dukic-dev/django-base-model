@@ -2,11 +2,11 @@ from collections import defaultdict
 from importlib import import_module
 from json import loads
 
-from django.conf import settings
 from django.core import serializers
 from django.db import models, transaction
 from django.db.models.fields.reverse_related import OneToOneRel, ManyToOneRel
 
+from django_base_model.settings import VALIDATION_ERROR_MODULE
 from django_base_model.signals import (
     base_create,
     base_update,
@@ -16,7 +16,7 @@ from django_base_model.signals import (
 )
 
 
-exceptions_module = import_module(settings.VALIDATION_ERROR_MODULE)
+exceptions_module = import_module(VALIDATION_ERROR_MODULE)
 ValidationError = getattr(exceptions_module, "ValidationError")
 
 
