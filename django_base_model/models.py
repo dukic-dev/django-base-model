@@ -1,8 +1,9 @@
 from collections import defaultdict
+from importlib import import_module
 from json import loads
 
+from django.conf import settings
 from django.core import serializers
-from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.fields.reverse_related import OneToOneRel, ManyToOneRel
 
@@ -13,6 +14,10 @@ from django_base_model.signals import (
     base_bulk_create,
     base_bulk_delete,
 )
+
+
+exceptions_module = import_module(settings.VALIDATION_ERROR_MODULE)
+ValidationError = getattr(exceptions_module, "ValidationError")
 
 
 KWARG_PREFIX = "_base"
