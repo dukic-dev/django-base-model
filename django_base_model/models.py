@@ -41,6 +41,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def update(self, *args, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
+        skip_full_clean = kwargs.pop(f"{KWARG_PREFIX}_skip_full_clean", False)
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -51,6 +52,10 @@ class BaseQuerySet(models.QuerySet):
 
         if not skip_pre_save:
             self.model.bulk_pre_save(self)
+
+        if not skip_full_clean:
+            for obj in self:
+                obj.full_clean()
 
         # Call super so that updated objects are sent as a parameter in signal
         objs = super().update(*args, **kwargs)
@@ -104,6 +109,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def bulk_create(self, *args, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
+        skip_full_clean = kwargs.pop(f"{KWARG_PREFIX}_skip_full_clean", False)
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -114,6 +120,10 @@ class BaseQuerySet(models.QuerySet):
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        if not skip_full_clean:
+            for obj in args[0]:
+                obj.full_clean()
 
         objs = super().bulk_create(*args, *kwargs)
 
@@ -266,11 +276,11 @@ class BaseModel(models.Model):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
-        if not skip_full_clean:
-            self.full_clean()
-
         if not skip_pre_save:
             self.pre_save(*args, **kwargs)
+
+        if not skip_full_clean:
+            self.full_clean()
 
         s = super().save(*args, **kwargs)
 
