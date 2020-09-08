@@ -53,12 +53,12 @@ class BaseQuerySet(models.QuerySet):
         if not skip_pre_save:
             self.model.bulk_pre_save(self)
 
+        # Call super so that updated objects are sent as a parameter in signal
+        objs = super().update(*args, **kwargs)
+
         if not skip_full_clean:
             for obj in self:
                 obj.full_clean()
-
-        # Call super so that updated objects are sent as a parameter in signal
-        objs = super().update(*args, **kwargs)
 
         base_update.send(sender=self.model, objs=self, user=user)
 
@@ -121,11 +121,11 @@ class BaseQuerySet(models.QuerySet):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
-        if not skip_full_clean:
-            for obj in args[0]:
-                obj.full_clean()
-
         objs = super().bulk_create(*args, *kwargs)
+
+        if not skip_full_clean:
+            for obj in self:
+                obj.full_clean()
 
         base_bulk_create.send(sender=self.model, objs=self, user=user)
 
