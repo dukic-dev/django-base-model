@@ -277,7 +277,7 @@ class BaseModel(models.Model):
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
         if not skip_pre_save:
-            self.pre_save(*args, **kwargs)
+            self.pre_save(*args, user=user, **kwargs)
 
         if not skip_full_clean:
             self.full_clean()
@@ -287,7 +287,7 @@ class BaseModel(models.Model):
         base_create.send(sender=self.__class__, obj=self, user=user)
 
         if not skip_post_save:
-            self.post_save(*args, **kwargs)
+            self.post_save(*args, user=user, **kwargs)
 
         return s
 
@@ -311,13 +311,13 @@ class BaseModel(models.Model):
         skip_pre_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_delete", False)
         skip_post_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_post_delete", False)
 
-        if not skip_pre_delete:
-            self.pre_delete(*args, **kwargs)
-
         if no_user:
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        if not skip_pre_delete:
+            self.pre_delete(*args, user=user, **kwargs)
 
         base_delete.send(sender=self.__class__, obj=self, user=user)
 
@@ -333,7 +333,7 @@ class BaseModel(models.Model):
         d = super().delete(*args, **kwargs)
 
         if not skip_post_delete:
-            self.post_delete(*args, **kwargs)
+            self.post_delete(*args, user=user, **kwargs)
 
         return d
 
