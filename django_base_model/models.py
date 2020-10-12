@@ -41,7 +41,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def update(self, *args, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
-        skip_full_clean = kwargs.pop(f"{KWARG_PREFIX}_skip_full_clean", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -56,9 +56,14 @@ class BaseQuerySet(models.QuerySet):
         # Call super so that updated objects are sent as a parameter in signal
         objs = super().update(*args, **kwargs)
 
-        if not skip_full_clean:
+        if clean_mode == "full":
             for obj in self:
                 obj.full_clean()
+        elif clean_mode == "basic":
+            for obj in self:
+                obj.clean()
+        elif clean_mode != "skip":
+            raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
         base_update.send(sender=self.model, objs=self, user=user)
 
@@ -109,7 +114,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def bulk_create(self, *args, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
-        skip_full_clean = kwargs.pop(f"{KWARG_PREFIX}_skip_full_clean", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -123,9 +128,14 @@ class BaseQuerySet(models.QuerySet):
 
         objs = super().bulk_create(*args, *kwargs)
 
-        if not skip_full_clean:
+        if clean_mode == "full":
             for obj in self:
                 obj.full_clean()
+        elif clean_mode == "basic":
+            for obj in self:
+                obj.clean()
+        elif clean_mode != "skip":
+            raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
         base_bulk_create.send(sender=self.model, objs=self, user=user)
 
@@ -137,6 +147,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def get_or_create(self, defaults=None, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -153,6 +164,7 @@ class BaseQuerySet(models.QuerySet):
             params.update(
                 {
                     f"{KWARG_PREFIX}_log_user": user,
+                    f"{KWARG_PREFIX}_clean_mode": clean_mode,
                     f"{KWARG_PREFIX}_skip_pre_save": skip_pre_save,
                     f"{KWARG_PREFIX}_skip_post_save": skip_post_save,
                 }
@@ -162,6 +174,7 @@ class BaseQuerySet(models.QuerySet):
     @transaction.atomic
     def update_or_create(self, defaults=None, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -172,6 +185,7 @@ class BaseQuerySet(models.QuerySet):
 
         base_kwargs = {
             f"{KWARG_PREFIX}_log_user": user,
+            f"{KWARG_PREFIX}_clean_mode": clean_mode,
             f"{KWARG_PREFIX}_skip_pre_save": skip_pre_save,
             f"{KWARG_PREFIX}_skip_post_save": skip_post_save,
         }
@@ -267,7 +281,7 @@ class BaseModel(models.Model):
     @transaction.atomic
     def save(self, *args, **kwargs):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
-        skip_full_clean = kwargs.pop(f"{KWARG_PREFIX}_skip_full_clean", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
@@ -279,8 +293,12 @@ class BaseModel(models.Model):
         if not skip_pre_save:
             self.pre_save(*args, user=user, **kwargs)
 
-        if not skip_full_clean:
+        if clean_mode == "full":
             self.full_clean()
+        elif clean_mode == "basic":
+            self.clean()
+        elif clean_mode != "skip":
+            raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
         s = super().save(*args, **kwargs)
 
