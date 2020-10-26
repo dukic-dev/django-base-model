@@ -99,7 +99,10 @@ class BaseQuerySet(models.QuerySet):
                     related_objects[many_to_one.model].add(o.pk)
 
         for model, pks in related_objects.items():
-            model.objects.filter(pk__in=pks).delete(**{f"{KWARG_PREFIX}_log_user": user})
+            if issubclass(model, BaseModel):
+                model.objects.filter(pk__in=pks).delete(**{f"{KWARG_PREFIX}_log_user": user})
+            else:
+                model.objects.filter(pk__in=pks).delete()
         # ----------------------------------------- END ----------------------------------------- #
 
         base_bulk_delete.send(sender=self.model, objs=self, user=user)
@@ -342,10 +345,16 @@ class BaseModel(models.Model):
         # ----- Trigger delete for all objects that would otherwise be deleted with CASCADE ----- #
         related_cascade_fields = self._related_cascade_fields
         for one_to_one in related_cascade_fields["one_to_one"]:
-            one_to_one.delete(**{f"{KWARG_PREFIX}_log_user": user})
+            if issubclass(one_to_one.model, BaseModel):
+                one_to_one.delete(**{f"{KWARG_PREFIX}_log_user": user})
+            else:
+                one_to_one.delete()
 
         for many_to_one in related_cascade_fields["many_to_one"]:
-            many_to_one.all().delete(**{f"{KWARG_PREFIX}_log_user": user})
+            if issubclass(many_to_one.model, BaseModel):
+                many_to_one.all().delete(**{f"{KWARG_PREFIX}_log_user": user})
+            else:
+                many_to_one.all().delete()
         # ----------------------------------------- END ----------------------------------------- #
 
         d = super().delete(*args, **kwargs)
