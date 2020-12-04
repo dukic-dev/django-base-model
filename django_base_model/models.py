@@ -121,6 +121,28 @@ class BaseQuerySet(models.QuerySet):
         skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
+        qs_objects = getattr(self.model, "objects")
+        if (
+            len(
+                [
+                    val
+                    for val in [
+                        isinstance(getattr(self.model, k), models.Manager)
+                        for k in vars(self.model).keys()
+                    ]
+                    if val
+                ]
+            )
+            > 1
+        ):
+            try:
+                qs_objects = getattr(self.model, kwargs.pop(f"{KWARG_PREFIX}_objects"))
+            except KeyError:
+                raise KeyError(
+                    f"There are more than one managers defined or this model. "
+                    f"Please pass {KWARG_PREFIX}_objects argument."
+                )
+
         if not skip_pre_save:
             self.model.bulk_pre_save(args[0])
 
@@ -140,7 +162,9 @@ class BaseQuerySet(models.QuerySet):
         elif clean_mode != "skip":
             raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
-        base_bulk_create.send(sender=self.model, objs=self, user=user)
+        obj_ids = [obj.id for obj in objs]
+        objs = qs_objects.filter(pk__in=obj_ids)
+        base_bulk_create.send(sender=self.model, objs=objs, user=user)
 
         if not skip_post_save:
             self.model.bulk_post_save(objs)
@@ -345,7 +369,7 @@ class BaseModel(models.Model):
         # ----- Trigger delete for all objects that would otherwise be deleted with CASCADE ----- #
         related_cascade_fields = self._related_cascade_fields
         for one_to_one in related_cascade_fields["one_to_one"]:
-            if issubclass(one_to_one.model, BaseModel):
+            if issubclass(one_to_one._meta.model, BaseModel):
                 one_to_one.delete(**{f"{KWARG_PREFIX}_log_user": user})
             else:
                 one_to_one.delete()
