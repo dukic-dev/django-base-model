@@ -50,6 +50,13 @@ class BaseQuerySet(models.QuerySet):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
+
         if not skip_pre_save:
             self.model.bulk_pre_save(self)
 
@@ -65,7 +72,8 @@ class BaseQuerySet(models.QuerySet):
         elif clean_mode != "skip":
             raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
-        base_update.send(sender=self.model, objs=self, user=user)
+        if not skip_signal_send:
+            base_update.send(sender=self.model, objs=self, user=user)
 
         if not skip_post_save:
             self.model.bulk_post_save(self)
@@ -82,6 +90,13 @@ class BaseQuerySet(models.QuerySet):
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
 
         if not skip_pre_delete:
             self.model.bulk_pre_delete(self)
@@ -105,7 +120,8 @@ class BaseQuerySet(models.QuerySet):
                 model.objects.filter(pk__in=pks).delete()
         # ----------------------------------------- END ----------------------------------------- #
 
-        base_bulk_delete.send(sender=self.model, objs=self, user=user)
+        if not skip_signal_send:
+            base_bulk_delete.send(sender=self.model, objs=self, user=user)
 
         delete = super().delete(*args, **kwargs)
 
@@ -122,24 +138,12 @@ class BaseQuerySet(models.QuerySet):
         skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
 
         qs_objects = getattr(self.model, "objects")
-        if (
-            len(
-                [
-                    val
-                    for val in [
-                        isinstance(getattr(self.model, k), models.Manager)
-                        for k in vars(self.model).keys()
-                    ]
-                    if val
-                ]
-            )
-            > 1
-        ):
+        if len(self.model._meta.managers) > 1:
             try:
                 qs_objects = getattr(self.model, kwargs.pop(f"{KWARG_PREFIX}_objects"))
             except KeyError:
                 raise KeyError(
-                    f"There are more than one managers defined or this model. "
+                    f"There is more than one manager defined on this model. "
                     f"Please pass {KWARG_PREFIX}_objects argument."
                 )
 
@@ -150,6 +154,13 @@ class BaseQuerySet(models.QuerySet):
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
 
         objs = super().bulk_create(*args, *kwargs)
 
@@ -162,9 +173,10 @@ class BaseQuerySet(models.QuerySet):
         elif clean_mode != "skip":
             raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
-        obj_ids = [obj.id for obj in objs]
-        objs = qs_objects.filter(pk__in=obj_ids)
-        base_bulk_create.send(sender=self.model, objs=objs, user=user)
+        if not skip_signal_send:
+            obj_ids = [obj.id for obj in objs]
+            objs = qs_objects.filter(pk__in=obj_ids)
+            base_bulk_create.send(sender=self.model, objs=objs, user=user)
 
         if not skip_post_save:
             self.model.bulk_post_save(objs)
@@ -183,6 +195,13 @@ class BaseQuerySet(models.QuerySet):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
+
         self._for_write = True
         try:
             return self.get(**kwargs), False
@@ -194,6 +213,7 @@ class BaseQuerySet(models.QuerySet):
                     f"{KWARG_PREFIX}_clean_mode": clean_mode,
                     f"{KWARG_PREFIX}_skip_pre_save": skip_pre_save,
                     f"{KWARG_PREFIX}_skip_post_save": skip_post_save,
+                    f"{KWARG_PREFIX}_skip_signal_send": skip_signal_send,
                 }
             )
             return self._create_object_from_params(kwargs, params)
@@ -210,11 +230,19 @@ class BaseQuerySet(models.QuerySet):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
+
         base_kwargs = {
             f"{KWARG_PREFIX}_log_user": user,
             f"{KWARG_PREFIX}_clean_mode": clean_mode,
             f"{KWARG_PREFIX}_skip_pre_save": skip_pre_save,
             f"{KWARG_PREFIX}_skip_post_save": skip_post_save,
+            f"{KWARG_PREFIX}_skip_signal_send": skip_signal_send,
         }
 
         defaults = defaults or {}
@@ -317,6 +345,13 @@ class BaseModel(models.Model):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
+
         if not skip_pre_save:
             self.pre_save(*args, user=user, **kwargs)
 
@@ -329,7 +364,8 @@ class BaseModel(models.Model):
 
         s = super().save(*args, **kwargs)
 
-        base_create.send(sender=self.__class__, obj=self, user=user)
+        if not skip_signal_send:
+            base_create.send(sender=self.__class__, obj=self, user=user)
 
         if not skip_post_save:
             self.post_save(*args, user=user, **kwargs)
@@ -361,10 +397,18 @@ class BaseModel(models.Model):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+        if len(self._meta.many_to_many) > 0 and skip_signal_send is None:
+            raise KeyError(
+                f"There are many to many fields defined for this model. "
+                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
+            )
+
         if not skip_pre_delete:
             self.pre_delete(*args, user=user, **kwargs)
 
-        base_delete.send(sender=self.__class__, obj=self, user=user)
+        if not skip_signal_send:
+            base_delete.send(sender=self.__class__, obj=self, user=user)
 
         # ----- Trigger delete for all objects that would otherwise be deleted with CASCADE ----- #
         related_cascade_fields = self._related_cascade_fields
