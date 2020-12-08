@@ -85,18 +85,12 @@ class BaseQuerySet(models.QuerySet):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
         skip_pre_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_delete", False)
         skip_post_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_post_delete", False)
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", False)
 
         if no_user:
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
-
-        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
-        if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
-            raise KeyError(
-                f"There are many to many fields defined for this model. "
-                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
-            )
 
         if not skip_pre_delete:
             self.model.bulk_pre_delete(self)
@@ -391,18 +385,12 @@ class BaseModel(models.Model):
         no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
         skip_pre_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_delete", False)
         skip_post_delete = kwargs.pop(f"{KWARG_PREFIX}_skip_post_delete", False)
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", False)
 
         if no_user:
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
-
-        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
-        if len(self._meta.many_to_many) > 0 and skip_signal_send is None:
-            raise KeyError(
-                f"There are many to many fields defined for this model. "
-                f"Please pass {KWARG_PREFIX}_skip_signal_send argument."
-            )
 
         if not skip_pre_delete:
             self.pre_delete(*args, user=user, **kwargs)
