@@ -356,10 +356,14 @@ class BaseModel(models.Model):
         elif clean_mode != "skip":
             raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
 
+        is_created = self.pk is None
         s = super().save(*args, **kwargs)
 
         if not skip_signal_send:
-            base_create.send(sender=self.__class__, obj=self, user=user)
+            if is_created:
+                base_create.send(sender=self.__class__, obj=self, user=user)
+            else:
+                base_update.send(sender=self.__class__, objs=[self], user=user)
 
         if not skip_post_save:
             self.post_save(*args, user=user, **kwargs)
