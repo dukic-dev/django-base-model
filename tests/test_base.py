@@ -176,6 +176,8 @@ def test_bulk_create(monkeypatch, db):
 
         objs = list(kwargs["objs"])
 
+        # This test if failing here because database in use is not Postgres so bulk create action
+        # doesn't return ids and objs is empty
         assert len(objs) == 3
 
         assert objs[0].pk is not None

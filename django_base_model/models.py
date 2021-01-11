@@ -92,6 +92,12 @@ class BaseQuerySet(models.QuerySet):
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
+        if hasattr(self, "select_related_for_delete"):
+            self = self.select_related_for_delete()
+
+        if hasattr(self, "prefetch_related_for_delete"):
+            self = self.prefetch_related_for_delete()
+
         if not skip_pre_delete:
             self.model.bulk_pre_delete(self, user)
 

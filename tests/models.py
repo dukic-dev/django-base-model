@@ -24,7 +24,7 @@ class Player(BaseModel):
             raise ValidationError("It is not possible to delete active instances")
 
     @classmethod
-    def bulk_pre_delete(cls, objs):
+    def bulk_pre_delete(cls, objs, user):
         for obj in objs:
             if obj.is_active:
                 raise ValidationError("It is not possible to delete active instances")
@@ -40,7 +40,7 @@ class PlayerTraining(BaseModel):
             raise ValidationError("It is not possible to delete active instances")
 
     @classmethod
-    def bulk_pre_delete(cls, objs):
+    def bulk_pre_delete(cls, objs, user):
         for obj in objs:
             if obj.is_active:
                 raise ValidationError("It is not possible to delete active instances")
