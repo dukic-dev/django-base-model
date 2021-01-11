@@ -58,7 +58,7 @@ class BaseQuerySet(models.QuerySet):
             )
 
         if not skip_pre_save:
-            self.model.bulk_pre_save(self)
+            self.model.bulk_pre_save(self, user)
 
         # Call super so that updated objects are sent as a parameter in signal
         objs = super().update(*args, **kwargs)
@@ -76,7 +76,7 @@ class BaseQuerySet(models.QuerySet):
             base_update.send(sender=self.model, objs=self, user=user)
 
         if not skip_post_save:
-            self.model.bulk_post_save(self)
+            self.model.bulk_post_save(self, user)
 
         return objs
 
@@ -93,7 +93,7 @@ class BaseQuerySet(models.QuerySet):
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
 
         if not skip_pre_delete:
-            self.model.bulk_pre_delete(self)
+            self.model.bulk_pre_delete(self, user)
 
         # ----- Trigger delete for all objects that would otherwise be deleted with CASCADE ----- #
         related_objects = defaultdict(set)
@@ -120,7 +120,7 @@ class BaseQuerySet(models.QuerySet):
         delete = super().delete(*args, **kwargs)
 
         if not skip_post_delete:
-            self.model.bulk_post_delete(self)
+            self.model.bulk_post_delete(self, user)
 
         return delete
 
@@ -141,13 +141,13 @@ class BaseQuerySet(models.QuerySet):
                     f"Please pass {KWARG_PREFIX}_objects argument."
                 )
 
-        if not skip_pre_save:
-            self.model.bulk_pre_save(args[0])
-
         if no_user:
             user = None
         else:
             user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        if not skip_pre_save:
+            self.model.bulk_pre_save(args[0], user)
 
         skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
         if len(self.model._meta.many_to_many) > 0 and skip_signal_send is None:
@@ -173,7 +173,7 @@ class BaseQuerySet(models.QuerySet):
             base_bulk_create.send(sender=self.model, objs=objs, user=user)
 
         if not skip_post_save:
-            self.model.bulk_post_save(objs)
+            self.model.bulk_post_save(objs, user)
 
         return objs
 
@@ -317,14 +317,14 @@ class BaseModel(models.Model):
         pass
 
     @classmethod
-    def bulk_pre_save(cls, objs):
+    def bulk_pre_save(cls, objs, user):
         pass
 
     def post_save(self, *args, **kwargs):
         pass
 
     @classmethod
-    def bulk_post_save(cls, objs):
+    def bulk_post_save(cls, objs, user):
         pass
 
     @transaction.atomic
@@ -374,14 +374,14 @@ class BaseModel(models.Model):
         pass
 
     @classmethod
-    def bulk_pre_delete(cls, objs):
+    def bulk_pre_delete(cls, objs, user):
         pass
 
     def post_delete(self, *args, **kwargs):
         pass
 
     @classmethod
-    def bulk_post_delete(cls, objs):
+    def bulk_post_delete(cls, objs, user):
         pass
 
     @transaction.atomic
