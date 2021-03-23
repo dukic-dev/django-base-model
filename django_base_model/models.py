@@ -165,10 +165,10 @@ class BaseQuerySet(models.QuerySet):
         objs = super().bulk_create(*args, *kwargs)
 
         if clean_mode == "full":
-            for obj in self:
+            for obj in objs:
                 obj.full_clean()
         elif clean_mode == "basic":
-            for obj in self:
+            for obj in objs:
                 obj.clean()
         elif clean_mode != "skip":
             raise ValueError("Clean mode must be `full`, `basic` or `skip`!")

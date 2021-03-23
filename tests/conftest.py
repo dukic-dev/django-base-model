@@ -6,7 +6,16 @@ def pytest_configure(config):
 
     settings.configure(
         DEBUG_PROPAGATE_EXCEPTIONS=True,
-        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+        DATABASES={
+            "default": {
+                "ENGINE": "django.db.backends.postgresql_psycopg2",
+                "HOST": "localhost",
+                "NAME": "django_base_model_test",
+                "USER": "django_base_model",
+                "PASSWORD": "django_base_model",
+                "PORT": "5432",
+            }
+        },
         SECRET_KEY="not very secret in tests",
         INSTALLED_APPS=(
             "django.contrib.admin",
