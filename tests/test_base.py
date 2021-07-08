@@ -196,6 +196,39 @@ def test_bulk_create(monkeypatch, db):
     Team.objects.bulk_create([team_1, team_2, team_3], _base_log_user=user)
 
 
+def test_bulk_update(monkeypatch, db):
+    user = UserFactory()
+
+    team_1 = TeamFactory(name=(team_1_name := "Team 1"), _base_log_user=user)
+    team_2 = TeamFactory(name=(team_2_name := "Team 2"), _base_log_user=user)
+    team_3 = TeamFactory(name=(team_3_name := "Team 3"), _base_log_user=user)
+
+
+    teams = [team_1, team_2]
+    new_names = ["Team 4", "Team 5"]
+
+    for i, team in enumerate(teams):
+        team.name = new_names[i]
+
+    def bulk_update_signal(sender, **kwargs):
+        assert sender == Team
+
+        objs = list(kwargs["objs"])
+
+        assert len(objs) == 2
+
+        assert objs[0].pk == team_1.pk
+        assert objs[0].name == new_names[0]
+
+        assert objs[1].pk == team_2.pk
+        assert objs[1].name == new_names[1]
+
+        assert kwargs["user"] == user
+
+    monkeypatch.setattr("django_base_model.signals.base_bulk_update.send", bulk_update_signal)
+
+    Team.objects.bulk_update(teams, fields=["name"], _base_log_user=user)
+
 def test_bulk_delete(monkeypatch, db):
     user = UserFactory()
 

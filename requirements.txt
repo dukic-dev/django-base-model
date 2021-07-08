@@ -1,11 +1,13 @@
 asgiref==3.2.10
 attrs==19.3.0
 Django==3.0.8
+djangorestframework==3.12.4
 factory-boy==2.12.0
 Faker==4.1.1
 more-itertools==8.4.0
 packaging==20.4
 pluggy==0.13.1
+psycopg2-binary==2.9.1
 py==1.9.0
 pyparsing==2.4.7
 pytest==5.4.3

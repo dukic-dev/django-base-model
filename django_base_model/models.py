@@ -3,8 +3,10 @@ from importlib import import_module
 from json import loads
 
 from django.core import serializers
-from django.db import models, transaction
+from django.db import connections, models, transaction
+from django.db.models.expressions import Case, Expression, Value, When
 from django.db.models.fields.reverse_related import OneToOneRel, ManyToOneRel
+from django.db.models.functions import Cast
 
 from django_base_model.settings import VALIDATION_ERROR_MODULE
 from django_base_model.signals import (
@@ -13,6 +15,7 @@ from django_base_model.signals import (
     base_delete,
     base_bulk_create,
     base_bulk_delete,
+    base_bulk_update,
 )
 
 
@@ -263,8 +266,88 @@ class BaseQuerySet(models.QuerySet):
             obj.save(using=self.db, **base_kwargs)
         return obj, False
 
-    def bulk_update(self, objs, fields, batch_size=None):
-        raise NotImplementedError("Bulk update method is currently not supported")
+    def _bulk_update(self, objs, fields, batch_size=None, user=None):
+        """
+        Update the given fields in each of the given objects in the database.
+        """
+        if batch_size is not None and batch_size < 0:
+            raise ValueError('Batch size must be a positive integer.')
+        if not fields:
+            raise ValueError('Field names must be given to bulk_update().')
+        objs = tuple(objs)
+        if any(obj.pk is None for obj in objs):
+            raise ValueError('All bulk_update() objects must have a primary key set.')
+        fields = [self.model._meta.get_field(name) for name in fields]
+        if any(not f.concrete or f.many_to_many for f in fields):
+            raise ValueError('bulk_update() can only be used with concrete fields.')
+        if any(f.primary_key for f in fields):
+            raise ValueError('bulk_update() cannot be used with primary key fields.')
+        if not objs:
+            return
+
+        # PK is used twice in the resulting update query, once in the filter
+        # and once in the WHEN. Each field will also have one CAST.
+        max_batch_size = connections[self.db].ops.bulk_batch_size(['pk', 'pk'] + fields, objs)
+        batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
+        requires_casting = connections[self.db].features.requires_casted_case_in_updates
+        batches = (objs[i:i + batch_size] for i in range(0, len(objs), batch_size))
+        updates = []
+        for batch_objs in batches:
+            update_kwargs = {}
+            for field in fields:
+                when_statements = []
+                for obj in batch_objs:
+                    attr = getattr(obj, field.attname)
+                    if not isinstance(attr, Expression):
+                        attr = Value(attr, output_field=field)
+                    when_statements.append(When(pk=obj.pk, then=attr))
+                case_statement = Case(*when_statements, output_field=field)
+                if requires_casting:
+                    case_statement = Cast(case_statement, output_field=field)
+                update_kwargs[field.attname] = case_statement
+            updates.append(([obj.pk for obj in batch_objs], update_kwargs))
+        with transaction.atomic(using=self.db, savepoint=False):
+            for pks, update_kwargs in updates:
+                update_kwargs["_base_log_user"] = user
+                update_kwargs["_base_skip_signal_send"] = True
+                self.filter(pk__in=pks).update(**update_kwargs)
+
+
+    @transaction.atomic
+    def bulk_update(self, objs, fields, batch_size=None, **kwargs):
+        no_user = kwargs.pop(f"{KWARG_PREFIX}_no_user", False)
+        clean_mode = kwargs.pop(f"{KWARG_PREFIX}_clean_mode", "full")
+        skip_pre_save = kwargs.pop(f"{KWARG_PREFIX}_skip_pre_save", False)
+        skip_post_save = kwargs.pop(f"{KWARG_PREFIX}_skip_post_save", False)
+
+        if no_user:
+            user = None
+        else:
+            user = kwargs.pop(f"{KWARG_PREFIX}_log_user")
+
+        if not skip_pre_save:
+            self.model.bulk_pre_save(objs, user)
+
+        skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
+
+        pks = [obj.pk for obj in objs]
+        self._bulk_update(objs, fields, batch_size, user)
+        objs = list(self.filter(pk__in=pks))
+
+        if clean_mode == "full":
+            for obj in objs:
+                obj.full_clean()
+        elif clean_mode == "basic":
+            for obj in objs:
+                obj.clean()
+        elif clean_mode != "skip":
+            raise ValueError("Clean mode must be `full`, `basic` or `skip`!")
+
+        if not skip_signal_send:
+            base_bulk_update.send(sender=self.model, objs=objs, user=user)
+
+        if not skip_post_save:
+            self.model.bulk_post_save(objs, user)
 
 
 class BaseManager(models.Manager):
