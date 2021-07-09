@@ -266,31 +266,31 @@ class BaseQuerySet(models.QuerySet):
             obj.save(using=self.db, **base_kwargs)
         return obj, False
 
-    def _bulk_update(self, objs, fields, batch_size=None, user=None):
+    def _bulk_update(self, objs, fields, batch_size=None, kwargs={}):
         """
         Update the given fields in each of the given objects in the database.
         """
         if batch_size is not None and batch_size < 0:
-            raise ValueError('Batch size must be a positive integer.')
+            raise ValueError("Batch size must be a positive integer.")
         if not fields:
-            raise ValueError('Field names must be given to bulk_update().')
+            raise ValueError("Field names must be given to bulk_update().")
         objs = tuple(objs)
         if any(obj.pk is None for obj in objs):
-            raise ValueError('All bulk_update() objects must have a primary key set.')
+            raise ValueError("All bulk_update() objects must have a primary key set.")
         fields = [self.model._meta.get_field(name) for name in fields]
         if any(not f.concrete or f.many_to_many for f in fields):
-            raise ValueError('bulk_update() can only be used with concrete fields.')
+            raise ValueError("bulk_update() can only be used with concrete fields.")
         if any(f.primary_key for f in fields):
-            raise ValueError('bulk_update() cannot be used with primary key fields.')
+            raise ValueError("bulk_update() cannot be used with primary key fields.")
         if not objs:
             return
 
         # PK is used twice in the resulting update query, once in the filter
         # and once in the WHEN. Each field will also have one CAST.
-        max_batch_size = connections[self.db].ops.bulk_batch_size(['pk', 'pk'] + fields, objs)
+        max_batch_size = connections[self.db].ops.bulk_batch_size(["pk", "pk"] + fields, objs)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
         requires_casting = connections[self.db].features.requires_casted_case_in_updates
-        batches = (objs[i:i + batch_size] for i in range(0, len(objs), batch_size))
+        batches = (objs[i : i + batch_size] for i in range(0, len(objs), batch_size))
         updates = []
         for batch_objs in batches:
             update_kwargs = {}
@@ -308,10 +308,7 @@ class BaseQuerySet(models.QuerySet):
             updates.append(([obj.pk for obj in batch_objs], update_kwargs))
         with transaction.atomic(using=self.db, savepoint=False):
             for pks, update_kwargs in updates:
-                update_kwargs["_base_log_user"] = user
-                update_kwargs["_base_skip_signal_send"] = True
-                self.filter(pk__in=pks).update(**update_kwargs)
-
+                self.filter(pk__in=pks).update(**update_kwargs, **kwargs)
 
     @transaction.atomic
     def bulk_update(self, objs, fields, batch_size=None, **kwargs):
@@ -331,7 +328,20 @@ class BaseQuerySet(models.QuerySet):
         skip_signal_send = kwargs.pop(f"{KWARG_PREFIX}_skip_signal_send", None)
 
         pks = [obj.pk for obj in objs]
-        self._bulk_update(objs, fields, batch_size, user)
+        self._bulk_update(
+            objs,
+            fields,
+            batch_size,
+            # bulk update will actually call .update but there is no need to call clean, pre_save,
+            # post_save or to send any signals because we are doing that here in bulk_update
+            kwargs={
+                f"{KWARG_PREFIX}_log_user": user,
+                f"{KWARG_PREFIX}_clean_mode": "skip",
+                f"{KWARG_PREFIX}_skip_pre_save": True,
+                f"{KWARG_PREFIX}_skip_post_save": True,
+                f"{KWARG_PREFIX}_skip_signal_send": True,
+            },
+        )
         objs = list(self.filter(pk__in=pks))
 
         if clean_mode == "full":

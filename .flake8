@@ -1,0 +1,4 @@
+[flake8]
+exclude = django_base_model/settings.py, */migrations
+ignore = D100, D101, D102, D104, D105, D106, D302, W504, W503, E203
+max-line-length = 99

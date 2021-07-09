@@ -199,10 +199,9 @@ def test_bulk_create(monkeypatch, db):
 def test_bulk_update(monkeypatch, db):
     user = UserFactory()
 
-    team_1 = TeamFactory(name=(team_1_name := "Team 1"), _base_log_user=user)
-    team_2 = TeamFactory(name=(team_2_name := "Team 2"), _base_log_user=user)
-    team_3 = TeamFactory(name=(team_3_name := "Team 3"), _base_log_user=user)
-
+    team_1 = TeamFactory(name="Team 1", _base_log_user=user)
+    team_2 = TeamFactory(name="Team 2", _base_log_user=user)
+    TeamFactory(name="Team 3", _base_log_user=user)
 
     teams = [team_1, team_2]
     new_names = ["Team 4", "Team 5"]
@@ -229,6 +228,7 @@ def test_bulk_update(monkeypatch, db):
 
     Team.objects.bulk_update(teams, fields=["name"], _base_log_user=user)
 
+
 def test_bulk_delete(monkeypatch, db):
     user = UserFactory()
 
@@ -238,7 +238,10 @@ def test_bulk_delete(monkeypatch, db):
     player_1 = PlayerFactory(name=(player_1_name := "Player 1"), team=team_1, _base_log_user=user)
     player_2 = PlayerFactory(name=(player_2_name := "Player 2"), team=team_2, _base_log_user=user)
     player_3 = PlayerFactory(
-        name=(player_3_name := "Player 3"), team=team_2, is_active=True, _base_log_user=user,
+        name=(player_3_name := "Player 3"),
+        team=team_2,
+        is_active=True,
+        _base_log_user=user,
     )
 
     # It is not possible to delete all teams because 3rd player is active and it is not possible
@@ -346,7 +349,10 @@ def test_update_or_create(monkeypatch, db):
     monkeypatch.setattr("django_base_model.signals.base_create.send", save_signal)
 
     Player.objects.update_or_create(
-        name=new_player_name, team=team_1, defaults={"team": team_2}, _base_log_user=user,
+        name=new_player_name,
+        team=team_1,
+        defaults={"team": team_2},
+        _base_log_user=user,
     )
 
     assert Player.objects.count() == 2

@@ -1,0 +1,16 @@
+[tool.black]
+line-length=99
+target-version=["py38"]
+exclude = '''
+/(
+  \.git
+  | cache
+  | .envs
+  | deployment
+  | docs
+  | frontend
+  | logs
+  | media
+  | meta
+)/
+'''
